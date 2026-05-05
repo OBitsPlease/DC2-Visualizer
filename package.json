@@ -27,22 +27,41 @@
       "!node_modules/.cache"
     ],
     "extraResources": [
-      { "from": "music/", "to": "music" }
+      {
+        "from": "music/",
+        "to": "music"
+      }
     ],
     "win": {
       "icon": "icons/doge2.ico",
-      "target": [{ "target": "nsis", "arch": ["x64"] }]
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
     },
     "mac": {
       "icon": "icons/doge2.icns",
-      "target": [{ "target": "dmg" }],
+      "target": [
+        {
+          "target": "dmg"
+        }
+      ],
       "category": "public.app-category.utilities"
     },
     "linux": {
       "icon": "icons/doge2-512.png",
+      "maintainer": "BitsPleaseYT <169328794+OBitsPlease@users.noreply.github.com>",
       "target": [
-        { "target": "AppImage" },
-        { "target": "deb" }
+        {
+          "target": "AppImage"
+        },
+        {
+          "target": "deb"
+        }
       ],
       "category": "Utility"
     },
@@ -63,6 +82,7 @@
   },
   "devDependencies": {
     "electron": "^29.0.0",
-    "electron-builder": "^24.0.0"
+    "electron-builder": "^24.0.0",
+    "png-to-ico": "^3.0.1"
   }
 }

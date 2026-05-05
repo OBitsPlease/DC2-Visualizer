@@ -14,15 +14,15 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-            build_script: build:win
+            eb_flag: --win
             artifacts: dist/*.exe
           - os: macos-latest
             name: macOS
-            build_script: build:mac
+            eb_flag: --mac
             artifacts: dist/*.dmg
           - os: ubuntu-latest
             name: Linux
-            build_script: build:linux
+            eb_flag: --linux
             artifacts: |
               dist/*.AppImage
               dist/*.deb
@@ -44,9 +44,7 @@ jobs:
         run: npm ci
 
       - name: Build installer
-        run: npm run ${{ matrix.build_script }}
-        env:
-          ELECTRON_BUILDER_PUBLISH: never
+        run: npx electron-builder ${{ matrix.eb_flag }} --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
