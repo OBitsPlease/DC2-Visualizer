@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+out/
+
+# Runtime-generated files
+DOGE2-Visualizer-URL.txt
+cf-stderr.log
+cf-*.log
+*.log
+
+# Daemon binaries (added by installer, not committed)
+daemon/
+
+# OS junk
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Electron cache
+.electron/

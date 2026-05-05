@@ -1,0 +1,68 @@
+{
+  "name": "dc2-visualizer",
+  "version": "1.0.0",
+  "description": "DOGE2 Blockchain 3D Visualizer - Live chain explorer with game mode, music, and Cloudflare sharing",
+  "main": "electron-main.js",
+  "author": "BitsPleaseYT",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "node doge2-server.js",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux",
+    "build": "electron-builder --win --mac --linux"
+  },
+  "build": {
+    "appId": "org.doge2.visualizer",
+    "productName": "DC2 Visualizer",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "electron-main.js",
+      "doge2-server.js",
+      "doge2-visualizer.html",
+      "icons/**",
+      "!node_modules/.cache"
+    ],
+    "extraResources": [
+      { "from": "music/", "to": "music" }
+    ],
+    "win": {
+      "icon": "icons/doge2.ico",
+      "target": [{ "target": "nsis", "arch": ["x64"] }]
+    },
+    "mac": {
+      "icon": "icons/doge2.icns",
+      "target": [{ "target": "dmg" }],
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "icon": "icons/doge2-512.png",
+      "target": [
+        { "target": "AppImage" },
+        { "target": "deb" }
+      ],
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "icons/doge2.ico",
+      "uninstallerIcon": "icons/doge2.ico",
+      "installerHeaderIcon": "icons/doge2.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DC2 Visualizer"
+    },
+    "dmg": {
+      "title": "DC2 Visualizer",
+      "icon": "icons/doge2.icns"
+    }
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.0.0"
+  }
+}

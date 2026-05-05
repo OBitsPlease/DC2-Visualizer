@@ -1,0 +1,1588 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DOGE2 Live Chain Visualizer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #fff;
+      font-family: 'Segoe UI', sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+    }
+    canvas { display: block; }
+
+    /* ── HUD ── */
+    #hud {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 10;
+      pointer-events: none;
+    }
+    #header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 24px;
+      background: linear-gradient(180deg, rgba(10,10,15,0.95) 0%, transparent 100%);
+    }
+    #logo {
+      font-size: 26px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, #f4b731, #ff8c00, #f4b731);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: none;
+    }
+    #tagline {
+      font-size: 11px;
+      color: #f4b731aa;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    #live-dot {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: #4fffb0;
+      margin-left: auto;
+    }
+    #live-dot span {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #4fffb0;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50% { opacity:0.4; transform:scale(1.4); }
+    }
+
+    /* ── stats bar ── */
+    #stats-bar {
+      display: flex;
+      gap: 10px;
+      padding: 8px 24px 0;
+      flex-wrap: wrap;
+    }
+    .stat-card {
+      background: rgba(244,183,49,0.07);
+      border: 1px solid rgba(244,183,49,0.2);
+      border-radius: 10px;
+      padding: 8px 16px;
+      min-width: 110px;
+    }
+    .stat-label {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: #f4b731aa;
+      text-transform: uppercase;
+    }
+    .stat-value {
+      font-size: 15px;
+      font-weight: 700;
+      color: #f4b731;
+      margin-top: 2px;
+    }
+
+    /* ── block info panel ── */
+    #block-panel {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 10;
+      width: 280px;
+      background: rgba(10,10,20,0.92);
+      border: 1px solid rgba(244,183,49,0.35);
+      border-radius: 14px;
+      padding: 16px 18px;
+      backdrop-filter: blur(12px);
+      transition: opacity 0.3s;
+    }
+    #block-panel h3 {
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #f4b731;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+      border-bottom: 1px solid rgba(244,183,49,0.15);
+      padding-bottom: 8px;
+    }
+    .bp-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 7px;
+      font-size: 12px;
+    }
+    .bp-key { color: #888; }
+    .bp-val { color: #fff; font-weight: 600; max-width: 170px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* ── tooltip ── */
+    #tooltip {
+      position: fixed;
+      pointer-events: none;
+      z-index: 20;
+      background: rgba(10,10,20,0.92);
+      border: 1px solid #f4b731;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      display: none;
+    }
+    #tooltip .tt-height { color: #f4b731; font-weight: 700; font-size: 14px; }
+
+    /* ── game mode toggle button ── */
+    #game-toggle {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      padding: 10px 20px;
+      border: 2px solid #555;
+      border-radius: 30px;
+      background: rgba(10,10,20,0.85);
+      color: #555;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+      backdrop-filter: blur(8px);
+      user-select: none;
+    }
+    #game-toggle:hover {
+      border-color: #ff4444;
+      color: #ff4444;
+    }
+    #game-toggle.active {
+      border-color: #ff4444;
+      color: #ff4444;
+      background: rgba(255,40,40,0.12);
+      box-shadow: 0 0 18px rgba(255,40,40,0.35);
+    }
+    body.game-mode { cursor: crosshair; }
+
+    /* ── music player ── */
+    #music-player {
+      position: fixed;
+      bottom: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      background: rgba(10,10,20,0.85);
+      border: 1px solid #333;
+      border-radius: 16px;
+      padding: 8px 18px 10px;
+      backdrop-filter: blur(8px);
+      font-size: 11px;
+      color: #aaa;
+      user-select: none;
+    }
+    #music-genre-tabs {
+      display: flex;
+      gap: 6px;
+    }
+    .music-genre-tab {
+      background: none;
+      border: 1px solid #444;
+      border-radius: 20px;
+      color: #666;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 3px 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .music-genre-tab:hover { border-color: #f4b731; color: #f4b731; }
+    .music-genre-tab.active { border-color: #f4b731; color: #f4b731; background: rgba(244,183,49,0.1); }
+    #music-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    #music-player button {
+      background: none;
+      border: none;
+      color: #f4b731;
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+      transition: color 0.15s;
+    }
+    #music-player button:hover { color: #fff; }
+    #music-track-name {
+      max-width: 180px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #ccc;
+    }
+    #music-vol {
+      width: 64px;
+      accent-color: #f4b731;
+      cursor: pointer;
+    }
+    #music-mute-btn { font-size: 14px !important; }
+
+    /* ── controls hint ── */
+    #controls-hint {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      z-index: 10;
+      font-size: 10px;
+      color: #555;
+      line-height: 1.7;
+    }
+
+    /* ── score display ── */
+    #score-panel {
+      position: fixed;
+      top: 14px;
+      right: 24px;
+      z-index: 10;
+      text-align: right;
+      pointer-events: none;
+    }
+    #score-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      color: #f4b731aa;
+      text-transform: uppercase;
+    }
+    #score-value {
+      font-size: 32px;
+      font-weight: 900;
+      color: #f4b731;
+      line-height: 1;
+      text-shadow: 0 0 20px #f4b73188;
+    }
+    #score-streak {
+      font-size: 11px;
+      color: #4fffb0;
+      min-height: 16px;
+      transition: opacity 0.5s;
+    }
+
+    /* ── crosshair ── */
+    #crosshair {
+      position: fixed;
+      pointer-events: none;
+      z-index: 15;
+      transform: translate(-50%, -50%);
+      display: none;
+    }
+    #crosshair svg { filter: drop-shadow(0 0 4px #ff4444); }
+
+    /* ── hit flash ── */
+    #hit-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 50;
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+
+    /* ── loading overlay ── */
+    #loading {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #0a0a0f;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      transition: opacity 0.8s;
+    }
+    #loading.hidden { opacity: 0; pointer-events: none; }
+    .doge-spinner {
+      font-size: 64px;
+      animation: spin3d 2s linear infinite;
+    }
+    @keyframes spin3d {
+      0%   { transform: rotateY(0deg); }
+      100% { transform: rotateY(360deg); }
+    }
+    #loading p { color: #f4b731aa; letter-spacing: 3px; font-size: 13px; text-transform: uppercase; }
+    #loading .progress-bar {
+      width: 220px;
+      height: 3px;
+      background: rgba(244,183,49,0.15);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    #loading .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #f4b731, #ff8c00);
+      border-radius: 2px;
+      animation: load-fill 2s ease-out forwards;
+    }
+    @keyframes load-fill { to { width: 100%; } }
+  </style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div id="loading">
+  <div class="doge-spinner">🐕</div>
+  <p>Such blocks. Many chain.</p>
+  <div class="progress-bar"><div class="progress-fill"></div></div>
+</div>
+
+<!-- Canvas -->
+<div id="canvas-container"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="header">
+    <div>
+      <div id="logo">
+        <img src="/icons/doge2-256.png" alt="DOGE2" style="height:48px;width:48px;border-radius:50%;vertical-align:middle;margin-right:10px;object-fit:cover;">
+        DOGE2 CHAIN
+      </div>
+      <div id="tagline">Live Blockchain Visualizer &nbsp;·&nbsp; <span style="color:#f4b731cc;font-size:10px;letter-spacing:1px;">Created by BitsPleaseYT</span></div>
+    </div>
+    <div id="live-dot"><span></span> LIVE</div>
+  </div>
+  <div id="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Block Height</div>
+      <div class="stat-value" id="s-height">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Difficulty</div>
+      <div class="stat-value" id="s-diff">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Hashrate (GH/s)</div>
+      <div class="stat-value" id="s-hash">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Mempool TXs</div>
+      <div class="stat-value" id="s-mempool">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Peers</div>
+      <div class="stat-value" id="s-conn">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Chain Size</div>
+      <div class="stat-value" id="s-size">—</div>
+    </div>
+  </div>
+</div>
+
+  <div id="block-panel">
+  <h3>🐾 Latest Block</h3>
+  <div class="bp-row"><span class="bp-key">Height</span><span class="bp-val" id="bp-height">—</span></div>
+  <div class="bp-row"><span class="bp-key">Hash</span><span class="bp-val" id="bp-hash">—</span></div>
+  <div class="bp-row"><span class="bp-key">Transactions</span><span class="bp-val" id="bp-txs">—</span></div>
+  <div class="bp-row"><span class="bp-key">Difficulty</span><span class="bp-val" id="bp-diff">—</span></div>
+  <div class="bp-row"><span class="bp-key">Size</span><span class="bp-val" id="bp-size">—</span></div>
+  <div class="bp-row"><span class="bp-key">Miner</span><span class="bp-val" id="bp-miner">—</span></div>
+  <div class="bp-row"><span class="bp-key">Time</span><span class="bp-val" id="bp-time">—</span></div>
+</div>
+
+<!-- Tooltip -->
+<div id="tooltip">
+  <div class="tt-height" id="tt-height"></div>
+  <div id="tt-txs" style="color:#aaa;font-size:11px;"></div>
+</div>
+
+<!-- Game mode toggle -->
+<button id="game-toggle" onclick="toggleGameMode()">🎯 Game Mode</button>
+
+<!-- Music player -->
+<div id="music-player">
+  <div id="music-genre-tabs"><!-- tabs injected by JS --></div>
+  <div id="music-controls">
+    <button onclick="musicPrev()" title="Previous">⏮</button>
+    <button id="music-play-btn" onclick="musicTogglePlay()" title="Play/Pause">▶</button>
+    <button onclick="musicNext()" title="Next">⏭</button>
+    <span id="music-track-name">Loading...</span>
+    <input id="music-vol" type="range" min="0" max="1" step="0.05" value="0.35" oninput="musicSetVolume(this.value)" title="Volume">
+    <button id="music-mute-btn" onclick="musicToggleMute()" title="Mute/Unmute">🔊</button>
+  </div>
+</div>
+
+<!-- Controls hint -->
+<div id="controls-hint">
+  <span id="hint-explore">🖱 Drag to orbit &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Click block to inspect</span>
+  <span id="hint-game" style="display:none">🎯 Click to shoot &nbsp;·&nbsp; Hit targets <b style="color:#ff8">+10</b> &nbsp;·&nbsp; Hit blocks <b style="color:#f4b731">+50</b></span>
+</div>
+
+<!-- Score -->
+<div id="score-panel">
+  <div id="score-label">Score</div>
+  <div id="score-value">0</div>
+  <div id="score-streak"></div>
+</div>
+
+<!-- Crosshair -->
+<div id="crosshair">
+  <svg width="32" height="32" viewBox="0 0 32 32">
+    <circle cx="16" cy="16" r="10" fill="none" stroke="#ff4444" stroke-width="1.5" opacity="0.8"/>
+    <line x1="16" y1="2" x2="16" y2="10" stroke="#ff4444" stroke-width="1.5"/>
+    <line x1="16" y1="22" x2="16" y2="30" stroke="#ff4444" stroke-width="1.5"/>
+    <line x1="2" y1="16" x2="10" y2="16" stroke="#ff4444" stroke-width="1.5"/>
+    <line x1="22" y1="16" x2="30" y2="16" stroke="#ff4444" stroke-width="1.5"/>
+    <circle cx="16" cy="16" r="2" fill="#ff4444"/>
+  </svg>
+</div>
+
+<!-- Hit flash overlay -->
+<div id="hit-flash"></div>
+
+<!-- Three.js CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  DOGE2 3D Blockchain Visualizer
+// ═══════════════════════════════════════════════════════════════
+
+const EXPLORER = 'http://explorer.doge2.org';  // fallback (unused when proxy is up)
+const RPC_PROXY = '/rpc';   // relative — works both locally and via Cloudflare tunnel
+const POLL_INTERVAL = 15_000;   // 15 s — local daemon is fast
+const MAX_BLOCKS = 15;          // visible chain length
+const BLOCK_SPACING = 3.6;
+const BLOCK_SIZE = 1.8;
+
+// ── State ──────────────────────────────────────────────────────
+let scene, camera, renderer, clock;
+let blockMeshes = [];           // { mesh, height, data }
+let particleSystems = [];
+let starField;
+let raycaster, mouse;
+let isDragging = false, prevMouse = { x: 0, y: 0 };
+let mouseDownPos = { x: 0, y: 0 };  // track drag distance
+let gameMode = false;  // when true: click=shoot, no orbit
+let camTheta = 0, camPhi = 0.32, camRadius = 42;
+let latestHeight = 0;
+let animationQueue = [];        // blocks queued to fly-in
+let dogeSprites = [];           // floating doge icons
+
+// ── Game state ─────────────────────────────────────────────────
+let score = 0;
+let streak = 0;
+let gameObjects = [];           // flying targets
+let laserBeams  = [];           // fading laser lines
+let minerGroups = {};           // address → [blockMesh, ...]
+let minerLines  = [];           // THREE.Line scene objects (same-miner arcs)
+let targetSpawnTimer = 0;
+const TARGET_SPAWN_INTERVAL = 4; // seconds between new targets
+const TARGET_EMOJIS = ['🦴','🌕','🚀','💎','⭐','🪙','🔥','💫'];
+
+// ── Colours ────────────────────────────────────────────────────
+const C_GOLD   = 0xf4b731;
+const C_ORANGE = 0xff8c00;
+const C_TEAL   = 0x4fffb0;
+const C_BG     = 0x0a0a0f;
+const C_CHAIN  = 0x553300;
+
+// ═══════════════════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════════════════
+function init() {
+  // Scene
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(C_BG);
+  scene.fog = new THREE.FogExp2(C_BG, 0.010);
+
+  // Camera
+  camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
+  updateCamera();
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+  clock = new THREE.Clock();
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2(9999, 9999);
+
+  // Lighting
+  const ambient = new THREE.AmbientLight(0xffffff, 0.15);
+  scene.add(ambient);
+
+  const sunLight = new THREE.DirectionalLight(C_GOLD, 0.8);
+  sunLight.position.set(10, 20, 10);
+  scene.add(sunLight);
+
+  const rimLight = new THREE.PointLight(C_ORANGE, 1.2, 60);
+  rimLight.position.set(-15, 5, -10);
+  scene.add(rimLight);
+
+  // Stars
+  buildStarField();
+
+  // Floating doge emojis (canvas sprites)
+  buildDogeSprites();
+
+  // Events
+  window.addEventListener('resize', onResize);
+  renderer.domElement.addEventListener('mousedown', onMouseDown);
+  renderer.domElement.addEventListener('mousemove', onMouseMove);
+  renderer.domElement.addEventListener('mouseup', () => isDragging = false);
+  renderer.domElement.addEventListener('wheel', onWheel);
+  renderer.domElement.addEventListener('click', onCanvasClick);
+  renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: true });
+  renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: true });
+
+  // Start render loop
+  animate();
+
+  // Fetch data
+  fetchSummary();
+  fetchLatestBlocks();
+
+  setInterval(fetchSummary, POLL_INTERVAL);
+  setInterval(pollNewBlocks, POLL_INTERVAL);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  STAR FIELD
+// ═══════════════════════════════════════════════════════════════
+function buildStarField() {
+  const N = 2000;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(N * 3);
+  const colors = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    pos[i*3]   = (Math.random() - 0.5) * 400;
+    pos[i*3+1] = (Math.random() - 0.5) * 400;
+    pos[i*3+2] = (Math.random() - 0.5) * 400;
+    // warm star colours
+    const t = Math.random();
+    colors[i*3]   = 0.6 + t * 0.4;
+    colors[i*3+1] = 0.5 + t * 0.3;
+    colors[i*3+2] = 0.3 + t * 0.2;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({ size: 0.4, vertexColors: true, transparent: true, opacity: 0.7 });
+  starField = new THREE.Points(geo, mat);
+  scene.add(starField);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DOGE CANVAS SPRITES
+// ═══════════════════════════════════════════════════════════════
+function makeEmojiTexture(emoji, size = 64) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.font = `${size * 0.75}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, size / 2, size / 2);
+  return new THREE.CanvasTexture(canvas);
+}
+
+function buildDogeSprites() {
+  const emojis = ['🐕', '🐶', '🐾', '💛', '🦴', '🌕'];
+  const tex = emojis.map(e => makeEmojiTexture(e, 128));
+  for (let i = 0; i < 18; i++) {
+    const t = tex[i % tex.length];
+    const mat = new THREE.SpriteMaterial({ map: t, transparent: true, opacity: 0.55 });
+    const sprite = new THREE.Sprite(mat);
+    const r = 20 + Math.random() * 30;
+    const angle = Math.random() * Math.PI * 2;
+    const h = (Math.random() - 0.5) * 20;
+    sprite.position.set(Math.cos(angle) * r, h, Math.sin(angle) * r);
+    sprite.scale.setScalar(2.5 + Math.random() * 1.5);
+    sprite.userData.floatSpeed = 0.2 + Math.random() * 0.4;
+    sprite.userData.floatOffset = Math.random() * Math.PI * 2;
+    sprite.userData.orbitRadius = r;
+    sprite.userData.orbitAngle = angle;
+    sprite.userData.orbitSpeed = (Math.random() - 0.5) * 0.003;
+    scene.add(sprite);
+    dogeSprites.push(sprite);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  FLYING TARGETS
+// ═══════════════════════════════════════════════════════════════
+function spawnTarget() {
+  const emoji = TARGET_EMOJIS[Math.floor(Math.random() * TARGET_EMOJIS.length)];
+  const tex = makeEmojiTexture(emoji, 128);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.9 });
+  const sprite = new THREE.Sprite(mat);
+
+  // Spawn off one side of the chain, at random height/depth
+  const chainCenter = ((MAX_BLOCKS - 1) / 2) * BLOCK_SPACING;
+  const side = Math.random() < 0.5 ? -1 : 1;
+  sprite.position.set(
+    side < 0 ? -20 : chainCenter + 20,
+    (Math.random() - 0.3) * 16,
+    (Math.random() - 0.5) * 20
+  );
+  sprite.scale.setScalar(2.2 + Math.random() * 1.2);
+
+  // Velocity: drift across scene
+  sprite.userData.vel = new THREE.Vector3(
+    side * (0.015 + Math.random() * 0.025) * -1,
+    (Math.random() - 0.5) * 0.006,
+    (Math.random() - 0.5) * 0.006
+  );
+  sprite.userData.rotSpeed = (Math.random() - 0.5) * 0.04;
+  sprite.userData.isTarget = true;
+  sprite.userData.emoji = emoji;
+  sprite.userData.birthTime = performance.now();
+
+  scene.add(sprite);
+  gameObjects.push(sprite);
+}
+
+function updateTargets(dt) {
+  const chainCenter = ((MAX_BLOCKS - 1) / 2) * BLOCK_SPACING;
+  gameObjects = gameObjects.filter(obj => {
+    obj.position.addScaledVector(obj.userData.vel, 1);
+    obj.material.rotation += obj.userData.rotSpeed;
+    // Remove if drifted far off screen
+    const oob = obj.position.x < -30 || obj.position.x > chainCenter + 30;
+    if (oob) { scene.remove(obj); return false; }
+    return true;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  LASER BEAMS
+// ═══════════════════════════════════════════════════════════════
+function spawnLaserBeam(from, to, color = 0xff2222) {
+  const points = [from.clone(), to.clone()];
+  const geo = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 1,
+    blending: THREE.AdditiveBlending, linewidth: 2 });
+  const beam = new THREE.Line(geo, mat);
+  beam.userData.age = 0;
+  beam.userData.maxAge = 0.35;
+  scene.add(beam);
+  laserBeams.push(beam);
+}
+
+function updateLasers(dt) {
+  laserBeams = laserBeams.filter(b => {
+    b.userData.age += dt;
+    const t = b.userData.age / b.userData.maxAge;
+    b.material.opacity = 1 - t;
+    if (t >= 1) { scene.remove(b); return false; }
+    return true;
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  EXPLOSIONS & FIREWORKS
+// ═══════════════════════════════════════════════════════════════
+function explodeAt(pos, colors = [0xff4400, 0xffaa00, 0xffffff], count = 80) {
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(count * 3);
+  const vel = [];
+  for (let i = 0; i < count; i++) {
+    positions[i*3] = pos.x; positions[i*3+1] = pos.y; positions[i*3+2] = pos.z;
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = Math.random() * Math.PI;
+    const speed = 0.08 + Math.random() * 0.18;
+    vel.push(new THREE.Vector3(
+      Math.sin(phi) * Math.cos(theta) * speed,
+      Math.sin(phi) * Math.sin(theta) * speed,
+      Math.cos(phi) * speed
+    ));
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const color = colors[Math.floor(Math.random() * colors.length)];
+  const mat = new THREE.PointsMaterial({ color, size: 0.22, transparent: true,
+    opacity: 1, blending: THREE.AdditiveBlending });
+  const ps = new THREE.Points(geo, mat);
+  ps.userData = { vel, age: 0, maxAge: 1.4, gravity: -0.003 };
+  scene.add(ps);
+  particleSystems.push(ps);
+}
+
+function fireworksBurst(pos) {
+  // Multi-color multi-wave burst
+  const palettes = [
+    [0xff2222, 0xff8800, 0xffff00],
+    [0x00ffaa, 0x00aaff, 0xaa00ff],
+    [0xf4b731, 0xff8c00, 0xffffff],
+  ];
+  palettes.forEach((cols, i) => {
+    setTimeout(() => explodeAt(pos, cols, 60 + i * 20), i * 180);
+  });
+  // Screen flash
+  const flash = document.getElementById('hit-flash');
+  flash.style.background = 'radial-gradient(circle, rgba(244,183,49,0.4) 0%, transparent 70%)';
+  flash.style.opacity = '1';
+  setTimeout(() => { flash.style.opacity = '0'; }, 120);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SHOOTING
+// ═══════════════════════════════════════════════════════════════
+function shoot(mx, my) {
+  // Build ray from camera through click point
+  const ray = new THREE.Raycaster();
+  const ndc = new THREE.Vector2(
+    (mx / window.innerWidth)  * 2 - 1,
+   -(my / window.innerHeight) * 2 + 1
+  );
+  ray.setFromCamera(ndc, camera);
+
+  // Laser end point (far plane hit on Y=0 plane, or fixed depth)
+  const laserEnd = ray.ray.origin.clone().addScaledVector(ray.ray.direction, 80);
+
+  // 1. Check game targets (sprites)
+  const targetHits = ray.intersectObjects(gameObjects);
+  if (targetHits.length > 0) {
+    const obj = targetHits[0].object;
+    const hitPos = targetHits[0].point;
+    spawnLaserBeam(camera.position, hitPos, 0xff2222);
+    explodeAt(hitPos, [0xff4400, 0xffaa00, 0xffffff]);
+    scene.remove(obj);
+    gameObjects = gameObjects.filter(g => g !== obj);
+    addScore(10, `💥 +10  ${obj.userData.emoji}`);
+    flashCrosshair();
+    return;
+  }
+
+  // 2. Check blocks
+  const blockCubes = blockMeshes.map(b => b.mesh.userData.cube);
+  const blockHits  = ray.intersectObjects(blockCubes);
+  if (blockHits.length > 0) {
+    const hitPos = blockHits[0].point;
+    const parent = blockHits[0].object.parent;
+    spawnLaserBeam(camera.position, hitPos, 0xf4b731);
+    fireworksBurst(parent.position.clone().add(new THREE.Vector3(0,1,0)));
+    const bd = blockMeshes.find(b => b.mesh === parent);
+    if (bd) updateBlockPanel(bd.data);
+    addScore(50, `🎆 +50  Block #${bd?.height || '?'}`);
+    flashCrosshair('#f4b731');
+    return;
+  }
+
+  // 3. Miss — draw laser beam into void
+  spawnLaserBeam(camera.position, laserEnd, 0xff2222);
+  streak = 0;
+}
+
+function addScore(pts, msg) {
+  streak++;
+  const multiplier = streak >= 5 ? 3 : streak >= 3 ? 2 : 1;
+  const total = pts * multiplier;
+  score += total;
+  document.getElementById('score-value').textContent = score.toLocaleString();
+  const streakEl = document.getElementById('score-streak');
+  const streakMsg = multiplier > 1 ? ` ×${multiplier} STREAK!` : '';
+  streakEl.textContent = msg + streakMsg;
+  streakEl.style.opacity = '1';
+  setTimeout(() => { streakEl.style.opacity = '0'; }, 1800);
+}
+
+function flashCrosshair(color = '#ff4444') {
+  const ch = document.getElementById('crosshair');
+  ch.querySelector('circle:last-child').style.fill = color;
+  setTimeout(() => { ch.querySelector('circle:last-child').style.fill = '#ff4444'; }, 150);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MINER LABELS & CONNECTION LINES
+// ═══════════════════════════════════════════════════════════════
+function getMinerAddress(bd) {
+  try {
+    const txs = bd.tx;
+    if (!txs?.length) return null;
+    const coinbase = txs[0];
+    // Verbosity 2: full tx object
+    if (typeof coinbase === 'object') {
+      return coinbase.vout?.[0]?.scriptPubKey?.addresses?.[0] ?? null;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function buildMinerLabelSprite(address) {
+  const short = address ? address.slice(-8) : '??????';
+  const c = document.createElement('canvas');
+  c.width = 200; c.height = 44;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(0,20,10,0.75)';
+  ctx.roundRect?.(0, 0, 200, 44, 8) || ctx.fillRect(0, 0, 200, 44);
+  ctx.fill?.();
+  ctx.strokeStyle = '#4fffb0';
+  ctx.lineWidth = 1.2;
+  ctx.roundRect?.(0, 0, 200, 44, 8) || ctx.strokeRect(0, 0, 200, 44);
+  ctx.stroke?.();
+  ctx.font = 'bold 15px monospace';
+  ctx.fillStyle = '#4fffb0';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('⛏ …' + short, 100, 22);
+  const tex = new THREE.CanvasTexture(c);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.9 });
+  const sp  = new THREE.Sprite(mat);
+  sp.scale.set(2.0, 0.45, 1);
+  sp.position.y = BLOCK_SIZE / 2 + 1.3;
+  return sp;
+}
+
+function rebuildMinerLines() {
+  // Remove old lines
+  minerLines.forEach(l => scene.remove(l));
+  minerLines = [];
+
+  // Group block meshes by miner address
+  const groups = {};
+  blockMeshes.forEach(({ mesh, data }) => {
+    const addr = data._minerAddress;
+    if (!addr) return;
+    (groups[addr] = groups[addr] || []).push(mesh);
+  });
+
+  // Draw a glowing arc between consecutive blocks by same miner
+  Object.values(groups).forEach(meshes => {
+    if (meshes.length < 2) return;
+    for (let i = 0; i < meshes.length - 1; i++) {
+      const a = meshes[i].position.clone().add(new THREE.Vector3(0, BLOCK_SIZE / 2 + 1.55, 0));
+      const b = meshes[i+1].position.clone().add(new THREE.Vector3(0, BLOCK_SIZE / 2 + 1.55, 0));
+      // Arc: midpoint raised
+      const mid = a.clone().lerp(b, 0.5);
+      mid.y += 1.8;
+      const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+      const pts = curve.getPoints(20);
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({
+        color: 0x4fffb0, transparent: true, opacity: 0.55,
+        blending: THREE.AdditiveBlending
+      });
+      const line = new THREE.Line(geo, mat);
+      scene.add(line);
+      minerLines.push(line);
+    }
+  });
+}
+function buildBlockMesh(blockData, index) {
+  const group = new THREE.Group();
+
+  // Main cube
+  const geo = new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+
+  // Metallic gold material
+  const mat = new THREE.MeshStandardMaterial({
+    color: C_GOLD,
+    emissive: new THREE.Color(C_ORANGE).multiplyScalar(0.15),
+    metalness: 0.7,
+    roughness: 0.3,
+  });
+  const cube = new THREE.Mesh(geo, mat);
+  cube.castShadow = true;
+  group.add(cube);
+
+  // Wireframe overlay
+  const wGeo = new THREE.EdgesGeometry(geo);
+  const wMat = new THREE.LineBasicMaterial({ color: C_ORANGE, transparent: true, opacity: 0.6 });
+  const wireframe = new THREE.LineSegments(wGeo, wMat);
+  group.add(wireframe);
+
+  // Glow sprite
+  const glowTex = buildGlowTexture();
+  const glowMat = new THREE.SpriteMaterial({ map: glowTex, color: C_GOLD, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending });
+  const glow = new THREE.Sprite(glowMat);
+  glow.scale.setScalar(BLOCK_SIZE * 3.5);
+  group.add(glow);
+
+  // Block number label sprite
+  const labelTex = buildLabelTexture(blockData.height);
+  const labelMat = new THREE.SpriteMaterial({ map: labelTex, transparent: true, opacity: 0.95 });
+  const label = new THREE.Sprite(labelMat);
+  label.scale.set(2.2, 0.55, 1);
+  label.position.y = BLOCK_SIZE / 2 + 0.55;
+  group.add(label);
+
+  // TX count orb
+  const txCount = blockData.tx ? blockData.tx.length : 0;
+  if (txCount > 0) {
+    const orbR = Math.min(0.15 + txCount * 0.04, 0.45);
+    const orbGeo = new THREE.SphereGeometry(orbR, 10, 10);
+    const orbMat = new THREE.MeshBasicMaterial({ color: C_TEAL, transparent: true, opacity: 0.9 });
+    const orb = new THREE.Mesh(orbGeo, orbMat);
+    orb.position.set(BLOCK_SIZE / 2 + 0.3, BLOCK_SIZE / 2 + 0.3, 0);
+    group.add(orb);
+  }
+
+  // Target position along chain
+  const targetX = index * BLOCK_SPACING;
+  group.position.set(targetX, 50, 0); // start above, will animate down
+  // Miner label (populated after data fetch)
+  const minerLabel = buildMinerLabelSprite(null);
+  group.add(minerLabel);
+  group.userData = { height: blockData.height, data: blockData, targetX, cube, wireframe, glow, glowMat, minerLabel, orbiting: false };
+
+  return group;
+}
+
+function buildGlowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64,64,0, 64,64,64);
+  g.addColorStop(0, 'rgba(244,183,49,0.8)');
+  g.addColorStop(0.4, 'rgba(255,140,0,0.3)');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0,0,128,128);
+  return new THREE.CanvasTexture(c);
+}
+
+function buildLabelTexture(height) {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.roundRect(0, 0, 256, 64, 10);
+  ctx.fill();
+  ctx.font = 'bold 28px monospace';
+  ctx.fillStyle = '#f4b731';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('#' + height.toLocaleString(), 128, 32);
+  return new THREE.CanvasTexture(c);
+}
+
+// ── Gold coin burst when a new block is found ──────────────────
+const _coinTex = makeEmojiTexture('🪙', 96);
+function coinBurst(blockPos) {
+  const COUNT = 55;
+  for (let i = 0; i < COUNT; i++) {
+    const mat = new THREE.SpriteMaterial({
+      map: _coinTex, transparent: true, opacity: 1,
+    });
+    const coin = new THREE.Sprite(mat);
+    coin.position.copy(blockPos);
+    const scale = 0.7 + Math.random() * 0.9;
+    coin.scale.setScalar(scale);
+
+    // Random spherical velocity — strong outward burst
+    const theta = Math.random() * Math.PI * 2;
+    const phi   = (Math.random() - 0.5) * Math.PI;
+    const speed = 0.12 + Math.random() * 0.28;
+    coin.userData.vel = new THREE.Vector3(
+      Math.cos(theta) * Math.cos(phi) * speed,
+      Math.abs(Math.sin(phi)) * speed * 1.2,  // bias upward
+      Math.sin(theta) * Math.cos(phi) * speed * 0.6
+    );
+    coin.userData.gravity = -(0.003 + Math.random() * 0.003);
+    coin.userData.age = 0;
+    coin.userData.maxAge = 1.8 + Math.random() * 1.0;
+    coin.userData.isCoin = true;
+    scene.add(coin);
+    gameObjects.push(coin);  // reuse update loop
+  }
+}
+
+// ── Override updateTargets to also handle coins ─────────────────
+function updateTargetsAndCoins(dt) {
+  const chainCenter = ((MAX_BLOCKS - 1) / 2) * BLOCK_SPACING;
+  gameObjects = gameObjects.filter(obj => {
+    if (obj.userData.isCoin) {
+      // Coin physics
+      obj.userData.vel.y += obj.userData.gravity;
+      obj.position.addScaledVector(obj.userData.vel, 1);
+      obj.userData.age += dt;
+      const t = obj.userData.age / obj.userData.maxAge;
+      obj.material.opacity = Math.max(0, 1 - t * t);
+      if (t >= 1) { scene.remove(obj); return false; }
+      return true;
+    }
+    // Regular target
+    obj.position.addScaledVector(obj.userData.vel, 1);
+    obj.material.rotation += obj.userData.rotSpeed;
+    const oob = obj.position.x < -30 || obj.position.x > chainCenter + 30;
+    if (oob) { scene.remove(obj); return false; }
+    return true;
+  });
+}
+function buildChainLink(fromX, toX) {
+  const midX = (fromX + toX) / 2;
+  const len = Math.abs(toX - fromX);
+  const geo = new THREE.CylinderGeometry(0.06, 0.06, len, 6);
+  const mat = new THREE.MeshBasicMaterial({ color: C_CHAIN, transparent: true, opacity: 0.6 });
+  const cyl = new THREE.Mesh(geo, mat);
+  cyl.rotation.z = Math.PI / 2;
+  cyl.position.set(midX, 0, 0);
+  return cyl;
+}
+
+// ── Burst particles when block lands ──────────────────────────
+function spawnBurst(x) {
+  const count = 60;
+  const geo = new THREE.BufferGeometry();
+  const pos = new Float32Array(count * 3);
+  const vel = [];
+  for (let i = 0; i < count; i++) {
+    pos[i*3] = x; pos[i*3+1] = 0; pos[i*3+2] = 0;
+    vel.push(new THREE.Vector3(
+      (Math.random()-0.5) * 0.25,
+      Math.random() * 0.25,
+      (Math.random()-0.5) * 0.25
+    ));
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const mat = new THREE.PointsMaterial({ color: C_GOLD, size: 0.15, transparent: true, opacity: 1, blending: THREE.AdditiveBlending });
+  const ps = new THREE.Points(geo, mat);
+  ps.userData = { vel, age: 0, maxAge: 2 };
+  scene.add(ps);
+  particleSystems.push(ps);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  DATA FETCHING  (local dogecoin2d via RPC proxy)
+// ═══════════════════════════════════════════════════════════════
+async function rpc(method, params = []) {
+  const res = await fetch(RPC_PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '1.0', id: method, method, params }),
+  });
+  const json = await res.json();
+  if (json.error) throw new Error(json.error.message);
+  return json.result;
+}
+
+async function fetchSummary() {
+  try {
+    const [info, mining, mempool, net] = await Promise.all([
+      rpc('getblockchaininfo'),
+      rpc('getmininginfo'),
+      rpc('getmempoolinfo'),
+      rpc('getnetworkinfo'),
+    ]);
+
+    document.getElementById('s-height').textContent = info.blocks?.toLocaleString() ?? '—';
+    document.getElementById('s-diff').textContent   = info.difficulty ? (+info.difficulty).toFixed(0) : '—';
+
+    // Hashrate: GH/s
+    const ghs = mining.networkhashps ? (mining.networkhashps / 1e9).toFixed(2) : '—';
+    document.getElementById('s-hash').textContent = ghs;
+
+    document.getElementById('s-mempool').textContent = mempool.size ?? '—';
+    document.getElementById('s-conn').textContent    = net.connections ?? '—';
+
+    const mb = info.size_on_disk ? (info.size_on_disk / 1e6).toFixed(0) + ' MB' : '—';
+    document.getElementById('s-size').textContent = mb;
+
+  } catch(e) { console.warn('Summary fetch failed', e); }
+}
+
+async function fetchLatestBlocks() {
+  try {
+    const info = await rpc('getblockchaininfo');
+    latestHeight = info.blocks;
+
+    const start = Math.max(1, latestHeight - MAX_BLOCKS + 1);
+    const heights = [];
+    for (let h = start; h <= latestHeight; h++) heights.push(h);
+
+    // Fetch hashes in parallel
+    const hashes = await Promise.all(heights.map(h => rpc('getblockhash', [h])));
+
+    // Fetch block data in parallel (verbose=2 for full tx)
+    const blocks = await Promise.all(hashes.map(hash => rpc('getblock', [hash, 2]).catch(() => null)));
+    const validBlocks = blocks.filter(Boolean);
+
+    clearBlocks();
+    validBlocks.forEach((bd, i) => addBlock(bd, i));
+
+    if (validBlocks.length > 0) {
+      updateBlockPanel(validBlocks[validBlocks.length - 1]);
+      rebuildMinerLines();
+    }
+
+    setTimeout(() => {
+      const el = document.getElementById('loading');
+      if (el) { el.classList.add('hidden'); setTimeout(() => el.remove(), 900); }
+    }, 400);
+
+  } catch(e) {
+    console.error('fetchLatestBlocks failed', e);
+    document.getElementById('loading').querySelector('p').textContent =
+      'Could not connect to local daemon. Is doge2-proxy.js running?';
+  }
+}
+
+async function pollNewBlocks() {
+  try {
+    const info = await rpc('getblockchaininfo');
+    const newHeight = info.blocks;
+    if (newHeight <= latestHeight) return;
+
+    for (let h = latestHeight + 1; h <= newHeight; h++) {
+      const hash = await rpc('getblockhash', [h]);
+      const bd   = await rpc('getblock', [hash, 2]);
+      enqueueNewBlock(bd);
+    }
+    latestHeight = newHeight;
+  } catch(e) { console.warn('Poll failed', e); }
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BLOCK MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+function clearBlocks() {
+  blockMeshes.forEach(({ mesh }) => scene.remove(mesh));
+  blockMeshes = [];
+  // remove old chain links
+  scene.children.filter(c => c.userData.isChainLink).forEach(c => scene.remove(c));
+}
+
+function addBlock(bd, index) {
+  // Extract miner address (requires verbosity 2 block data)
+  const minerAddr = getMinerAddress(bd);
+  bd._minerAddress = minerAddr;
+
+  const mesh = buildBlockMesh(bd, index);
+  scene.add(mesh);
+  blockMeshes.push({ mesh, height: bd.height, data: bd });
+
+  // Update miner label sprite with real address
+  if (minerAddr) {
+    const group = mesh;
+    // Remove placeholder label, add real one
+    const oldLabel = group.userData.minerLabel;
+    if (oldLabel) group.remove(oldLabel);
+    const realLabel = buildMinerLabelSprite(minerAddr);
+    group.add(realLabel);
+    group.userData.minerLabel = realLabel;
+  }
+
+  // Chain link to previous
+  if (index > 0) {
+    const link = buildChainLink((index - 1) * BLOCK_SPACING, index * BLOCK_SPACING);
+    link.userData.isChainLink = true;
+    scene.add(link);
+  }
+
+  // Animate fall-in
+  mesh.userData.animating = true;
+  mesh.userData.animTarget = new THREE.Vector3(index * BLOCK_SPACING, 0, 0);
+}
+
+function enqueueNewBlock(bd) {
+  animationQueue.push(bd);
+}
+
+function processQueue() {
+  if (animationQueue.length === 0) return;
+  const bd = animationQueue.shift();
+
+  // Shift existing blocks left
+  blockMeshes.forEach(({ mesh }, i) => {
+    mesh.userData.targetX -= BLOCK_SPACING;
+    mesh.userData.animTarget = new THREE.Vector3(mesh.userData.targetX, 0, 0);
+    mesh.userData.animating = true;
+  });
+
+  // Remove oldest if over limit
+  if (blockMeshes.length >= MAX_BLOCKS) {
+    const oldest = blockMeshes.shift();
+    scene.remove(oldest.mesh);
+  }
+
+  // Add new block at the end
+  const newIndex = blockMeshes.length;
+  addBlock(bd, blockMeshes.length > 0 ? blockMeshes[blockMeshes.length - 1].mesh.userData.targetX / BLOCK_SPACING + 1 : 0);
+  updateBlockPanel(bd);
+  const newBlock = blockMeshes[blockMeshes.length - 1];
+  coinBurst(newBlock.mesh.position.clone().add(new THREE.Vector3(0, 1, 0)));
+  rebuildMinerLines();
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  BLOCK PANEL UI
+// ═══════════════════════════════════════════════════════════════
+function updateBlockPanel(bd) {
+  document.getElementById('bp-height').textContent = bd.height?.toLocaleString() ?? '—';
+  document.getElementById('bp-hash').textContent = bd.hash ? bd.hash.slice(0,14) + '…' : '—';
+  document.getElementById('bp-txs').textContent = (bd.tx?.length ?? 0) + ' tx';
+  document.getElementById('bp-diff').textContent = bd.difficulty ? (+bd.difficulty).toFixed(2) : '—';
+  document.getElementById('bp-size').textContent = bd.size ? bd.size.toLocaleString() + ' B' : '—';
+  document.getElementById('bp-time').textContent = bd.time ? new Date(bd.time * 1000).toLocaleTimeString() : '—';
+
+  // Miner: prefer verbosity-2 coinbase address, fallback to auxpow coinbase decode
+  let miner = bd._minerAddress ? bd._minerAddress.slice(-12) : null;
+  if (!miner && bd.auxpow?.tx?.vin?.[0]?.coinbase) {
+    try {
+      const hex = bd.auxpow.tx.vin[0].coinbase;
+      const bytes = hex.match(/.{1,2}/g).map(b => parseInt(b,16));
+      const ascii = bytes.filter(b => b >= 32 && b < 127).map(b => String.fromCharCode(b)).join('');
+      const match = ascii.match(/[\w\.\-]{4,30}/g);
+      if (match) miner = match.find(m => m.includes('.') || m.length > 5) || match[0];
+    } catch { /* ignore */ }
+  }
+  document.getElementById('bp-miner').textContent = miner || '—';
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  ANIMATE
+// ═══════════════════════════════════════════════════════════════
+let queueTimer = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = clock.getDelta();
+  const elapsed = clock.getElapsedTime();
+
+  // Process new block queue every 2s
+  queueTimer += dt;
+  if (queueTimer > 2 && animationQueue.length > 0) {
+    queueTimer = 0;
+    processQueue();
+  }
+
+  // Animate block fall-in & hover
+  blockMeshes.forEach(({ mesh }, idx) => {
+    if (mesh.userData.animating && mesh.userData.animTarget) {
+      const t = mesh.userData.animTarget;
+      mesh.position.lerp(t, 0.08);
+      if (mesh.position.distanceTo(t) < 0.05) {
+        mesh.position.copy(t);
+        mesh.userData.animating = false;
+      }
+    }
+    // Gentle hover
+    mesh.position.y = Math.sin(elapsed * 0.6 + idx * 0.7) * 0.18;
+    // Slow rotation
+    mesh.userData.cube.rotation.y += dt * 0.15;
+    mesh.userData.wireframe.rotation.y += dt * 0.15;
+    // Pulse glow
+    mesh.userData.glowMat.opacity = 0.12 + Math.sin(elapsed * 1.2 + idx) * 0.06;
+  });
+
+  // Animate doge sprites
+  dogeSprites.forEach(s => {
+    s.userData.orbitAngle += s.userData.orbitSpeed;
+    const r = s.userData.orbitRadius;
+    s.position.x = Math.cos(s.userData.orbitAngle) * r;
+    s.position.z = Math.sin(s.userData.orbitAngle) * r;
+    s.position.y = s.position.y + Math.sin(elapsed * s.userData.floatSpeed + s.userData.floatOffset) * 0.005;
+    s.material.opacity = 0.35 + Math.sin(elapsed * 0.5 + s.userData.floatOffset) * 0.15;
+  });
+
+  // Star field slow rotation
+  if (starField) starField.rotation.y += dt * 0.01;
+
+  // ── Game systems ─────────────────────────────────────────────
+  updateLasers(dt);
+  updateTargetsAndCoins(dt);
+
+  // Spawn a new target periodically
+  targetSpawnTimer += dt;
+  if (targetSpawnTimer >= TARGET_SPAWN_INTERVAL) {
+    targetSpawnTimer = 0;
+    spawnTarget();
+  }
+
+  // Particle systems
+  particleSystems = particleSystems.filter(ps => {
+    ps.userData.age += dt;
+    const t = ps.userData.age / ps.userData.maxAge;
+    if (t >= 1) { scene.remove(ps); return false; }
+    ps.material.opacity = 1 - t;
+    const pos = ps.geometry.attributes.position.array;
+    for (let i = 0; i < ps.userData.vel.length; i++) {
+      pos[i*3]   += ps.userData.vel[i].x;
+      pos[i*3+1] += ps.userData.vel[i].y;
+      pos[i*3+2] += ps.userData.vel[i].z;
+      ps.userData.vel[i].y -= 0.004; // gravity
+    }
+    ps.geometry.attributes.position.needsUpdate = true;
+    return true;
+  });
+
+  // Raycasting for hover tooltip
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(blockMeshes.map(b => b.mesh.userData.cube));
+  const tt = document.getElementById('tooltip');
+  if (hits.length > 0) {
+    const hit = hits[0];
+    const parent = hit.object.parent;
+    const bd = blockMeshes.find(b => b.mesh === parent);
+    if (bd) {
+      tt.style.display = 'block';
+      document.getElementById('tt-height').textContent = '#' + bd.height.toLocaleString();
+      document.getElementById('tt-txs').textContent = (bd.data.tx?.length ?? 0) + ' transactions · ' + (bd.data.size ?? '?') + ' bytes';
+    }
+  } else {
+    tt.style.display = 'none';
+  }
+
+  renderer.render(scene, camera);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CAMERA / CONTROLS
+// ═══════════════════════════════════════════════════════════════
+function updateCamera() {
+  const x = camRadius * Math.sin(camTheta) * Math.cos(camPhi);
+  const y = camRadius * Math.sin(camPhi);
+  const z = camRadius * Math.cos(camTheta) * Math.cos(camPhi);
+  // Look at centre of chain
+  const chainCenterX = ((MAX_BLOCKS - 1) / 2) * BLOCK_SPACING;
+  camera.position.set(x + chainCenterX, y, z);
+  camera.lookAt(chainCenterX, 0, 0);
+}
+
+function toggleGameMode() {
+  gameMode = !gameMode;
+  const btn = document.getElementById('game-toggle');
+  const ch  = document.getElementById('crosshair');
+  if (gameMode) {
+    btn.classList.add('active');
+    btn.textContent = '🔭 Explore Mode';
+    document.body.classList.add('game-mode');
+    ch.style.display = 'block';
+    document.getElementById('hint-explore').style.display = 'none';
+    document.getElementById('hint-game').style.display = 'inline';
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '🎯 Game Mode';
+    document.body.classList.remove('game-mode');
+    ch.style.display = 'none';
+    isDragging = false;
+    // Clear any leftover laser beams
+    laserBeams.forEach(b => scene.remove(b));
+    laserBeams = [];
+    document.getElementById('hint-explore').style.display = 'inline';
+    document.getElementById('hint-game').style.display = 'none';
+  }
+}
+
+function onMouseDown(e) {
+  if (gameMode) return;          // no orbit while in game mode
+  isDragging = true;
+  prevMouse = { x: e.clientX, y: e.clientY };
+  mouseDownPos = { x: e.clientX, y: e.clientY };
+}
+
+function onMouseMove(e) {
+  // Update tooltip position
+  const tt = document.getElementById('tooltip');
+  tt.style.left = (e.clientX + 14) + 'px';
+  tt.style.top  = (e.clientY - 10) + 'px';
+
+  // Move crosshair
+  const ch = document.getElementById('crosshair');
+  ch.style.left = e.clientX + 'px';
+  ch.style.top  = e.clientY + 'px';
+
+  // Normalised for raycaster
+  mouse.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+  if (gameMode || !isDragging) return;
+  const dx = e.clientX - prevMouse.x;
+  const dy = e.clientY - prevMouse.y;
+  camTheta -= dx * 0.005;
+  camPhi    = Math.max(-0.5, Math.min(1.2, camPhi + dy * 0.005));
+  prevMouse = { x: e.clientX, y: e.clientY };
+  updateCamera();
+}
+
+function onWheel(e) {
+  camRadius = Math.max(8, Math.min(80, camRadius + e.deltaY * 0.05));
+  updateCamera();
+}
+
+let touchStart = null;
+function onTouchStart(e) {
+  if (gameMode) return;
+  if (e.touches.length === 1) touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+}
+function onTouchMove(e) {
+  if (gameMode || !touchStart || e.touches.length !== 1) return;
+  const dx = e.touches[0].clientX - touchStart.x;
+  const dy = e.touches[0].clientY - touchStart.y;
+  camTheta -= dx * 0.005;
+  camPhi = Math.max(-0.5, Math.min(1.2, camPhi + dy * 0.005));
+  touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  updateCamera();
+}
+
+function onCanvasClick(e) {
+  if (gameMode) {
+    // In game mode: shoot
+    shoot(e.clientX, e.clientY);
+    return;
+  }
+  // In explore mode: inspect block on click
+  mouse.x =  (e.clientX / window.innerWidth)  * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const hits = raycaster.intersectObjects(blockMeshes.map(b => b.mesh.userData.cube));
+  if (hits.length > 0) {
+    const parent = hits[0].object.parent;
+    const bd = blockMeshes.find(b => b.mesh === parent);
+    if (bd) updateBlockPanel(bd.data);
+  }
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ─── Polyfill roundRect for older browsers ──────────────────────
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+    if (w < 2*r) r = w/2; if (h < 2*r) r = h/2;
+    this.beginPath();
+    this.moveTo(x+r, y);
+    this.arcTo(x+w, y, x+w, y+h, r);
+    this.arcTo(x+w, y+h, x, y+h, r);
+    this.arcTo(x, y+h, x, y, r);
+    this.arcTo(x, y, x+w, y, r);
+    this.closePath();
+    return this;
+  };
+}
+
+// ── GO ─────────────────────────────────────────────────────────
+init();
+
+// ── MUSIC PLAYER ───────────────────────────────────────────────
+const musicAudio = new Audio();
+let musicGenres   = {};   // { lofi: [...], energy: [...] }
+let musicGenre    = '';   // active genre key
+let musicTracks   = [];   // tracks for active genre
+let musicIndex    = 0;
+let musicMuted    = false;
+let musicPlaying  = false;
+
+// Display labels for genre folder names
+const GENRE_LABELS = { lofi: 'LoFi', energy: 'Energy', default: 'Music' };
+
+async function musicInit() {
+  try {
+    const res = await fetch('/music');
+    musicGenres = await res.json();
+  } catch(e) { musicGenres = {}; }
+
+  const genreKeys = Object.keys(musicGenres).filter(g => musicGenres[g].length > 0);
+  if (genreKeys.length === 0) {
+    document.getElementById('music-player').style.display = 'none';
+    return;
+  }
+
+  // Build genre tab buttons
+  const tabsEl = document.getElementById('music-genre-tabs');
+  genreKeys.forEach(g => {
+    const btn = document.createElement('button');
+    btn.className = 'music-genre-tab';
+    btn.textContent = GENRE_LABELS[g] || g;
+    btn.dataset.genre = g;
+    btn.onclick = () => musicSwitchGenre(g);
+    tabsEl.appendChild(btn);
+  });
+
+  musicAudio.volume = 0.35;
+  musicAudio.addEventListener('ended', musicNext);
+  musicSwitchGenre(genreKeys[0]);
+  musicPlay();
+}
+
+function musicSwitchGenre(g) {
+  musicGenre  = g;
+  musicTracks = musicGenres[g] || [];
+  musicIndex  = 0;
+  // Update tab highlights
+  document.querySelectorAll('.music-genre-tab').forEach(b => {
+    b.classList.toggle('active', b.dataset.genre === g);
+  });
+  musicLoadTrack(0);
+  if (musicPlaying) musicPlay();
+}
+
+function musicLoadTrack(idx) {
+  musicIndex = ((idx % musicTracks.length) + musicTracks.length) % musicTracks.length;
+  const name = musicTracks[musicIndex];
+  musicAudio.src = '/music/' + encodeURIComponent(musicGenre) + '/' + encodeURIComponent(name);
+  document.getElementById('music-track-name').textContent = name.replace(/\.mp3$/i, '');
+}
+
+function musicPlay() {
+  musicAudio.play().then(() => {
+    musicPlaying = true;
+    document.getElementById('music-play-btn').textContent = '⏸';
+  }).catch(() => {
+    const resume = () => { musicPlay(); document.removeEventListener('click', resume); };
+    document.addEventListener('click', resume);
+  });
+}
+
+function musicTogglePlay() {
+  if (musicPlaying) {
+    musicAudio.pause();
+    musicPlaying = false;
+    document.getElementById('music-play-btn').textContent = '▶';
+  } else {
+    musicPlay();
+  }
+}
+
+function musicNext() {
+  musicLoadTrack(musicIndex + 1);
+  if (musicPlaying) musicPlay();
+}
+
+function musicPrev() {
+  musicLoadTrack(musicIndex - 1);
+  if (musicPlaying) musicPlay();
+}
+
+function musicSetVolume(v) {
+  musicAudio.volume = parseFloat(v);
+  if (musicMuted && v > 0) {
+    musicMuted = false;
+    musicAudio.muted = false;
+    document.getElementById('music-mute-btn').textContent = '🔊';
+  }
+}
+
+function musicToggleMute() {
+  musicMuted = !musicMuted;
+  musicAudio.muted = musicMuted;
+  document.getElementById('music-mute-btn').textContent = musicMuted ? '🔇' : '🔊';
+}
+
+musicInit();
+</script>
+</body>
+</html>
